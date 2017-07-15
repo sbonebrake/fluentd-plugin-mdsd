@@ -158,7 +158,7 @@ class SchemaManager
     def get_schema_key(record)
         key_str = ""
         record.each { |key, value|
-            key_str << key << "," << value.class.name << ","
+            key_str << "#{key},#{value.class.name},"
         }
         return key_str
     end
@@ -175,15 +175,14 @@ class SchemaManager
                 mdsd_typestr = "FT_STRING"
             end
 
-            if (schema_str == "")
-                schema_str << "[" << time_field_index.to_s << ","
+            if schema_str == ""
+                schema_str << "[#{key},#{mdsd_typestr}]"
             else
-                schema_str << ","
+                schema_str << ",[#{key},#{mdsd_typestr}]"
             end
-            schema_str << '["' << key << '","' << mdsd_typestr << '"]'
         }
-        schema_str << "]"
 
+        schema_str = "[#{time_field_index},#{schema_str}]"
         return schema_str
     end
 
@@ -207,12 +206,8 @@ class MdsdMsgMaker
     # 3,[1,["message","FT_STRING"],["EmitTimestamp","FT_TIME"]],["This is syslog msg",[1493671442,0]]]
     #
     def get_schema_value_str(record)
-        resultStr = ""
         schema_obj = @schema_mgr.get_schema_info(record)
-        resultStr << schema_obj[0].to_s << "," << schema_obj[1] << ","
-        resultStr << get_record_values(record)
-
-        return resultStr
+        return "#{schema_obj[0]},#{schema_obj[1]},#{get_record_values(record)}"
     end
 
     # If configured, convert (unify) fluentd tags to a unified tag (regex match) so that mdsd
@@ -236,20 +231,14 @@ class MdsdMsgMaker
 
     def get_record_values(record)
         resultStr = ""
-
-        record.each { |key, value|
-            if resultStr == ""
-                resultStr << "["
-            else
+        values = record.each { |key, value|
+            unless resultStr == ""
                 resultStr << ","
             end
             resultStr << get_value_by_type(value)
         }
-        resultStr << "]"
-
-        return resultStr
+        return "[#{resultStr}]"
     end
-
 
     # Get formatted value string accepted by mdsd dynamic json protocol.
     def get_value_by_type(value)
@@ -260,7 +249,7 @@ class MdsdMsgMaker
             # Treat data structure as a string. Use 'dump' to do proper escape.
             return value.to_s.dump
         elsif (value.kind_of? Time)
-            return ('[' + value.tv_sec.to_s + "," + value.tv_nsec.to_s + ']')
+            return ("[#{value.tv_sec.to_s},#{value.tv_nsec.to_s}]")
         else
             return value.to_s
         end
